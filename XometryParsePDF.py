@@ -10,7 +10,7 @@ import shutil
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
-logging.disable(logging.DEBUG)  # un/comment to un/block debug log messages
+# logging.disable(logging.DEBUG)  # un/comment to un/block debug log messages
 # logging.disable(logging.INFO)  # un/comment to un/block info log messages
 
 
@@ -65,13 +65,14 @@ def traveler_process(filename):
 
     # Regex pattern, probably the part that will need editing the most to fit all traveler patterns.
     pattern = re.compile(r'''
-        .*DateContact
+        .*?DateContact
         ([a-zA-Z]\w{7})                                     # PO Number
-        (\d\d/\d\d/\d\d\d\d)                              # Due Date
-        (.*@.*.com)                                         # Contact
-        .*
+        (\d\d/\d\d/\d\d\d\d)                                # Due Date
+        (.*?@.*?\.com)                                      # Contact
+        .*?
+        Quantity
         (0\w{6})                                            # Part ID
-        (.*)                                                # Part name
+        (.*?)                                               # Part name
         (\.sldprt|\.SLDPRT|\.step|\.STEP|\.stp|\.STP)       # Part Name extension
         ''', re.VERBOSE | re.DOTALL)
 
@@ -117,7 +118,7 @@ def rename_drawings(job_number):
     logging.info(f'Renaming drawings for the following Job Number: {job_number}')
 
     # Pattern that looks for files with the provided Job_Number, drawing, and drawing filetype.
-    drawing_pattern = re.compile(rf'({job_number}_r_drawing_d_).*(r_0).*(\.pdf|\.jpg|\.jpeg|\.PDF|\.JPG|\.JPEG)')
+    drawing_pattern = re.compile(rf'({job_number}_r_drawing_d_)(.*)(r_0).*(\.pdf|\.jpg|\.jpeg|\.PDF|\.JPG|\.JPEG)')
 
     # Searches through all files in the current working directory (directory provided).
     for orig_filename in os.listdir('.'):
@@ -127,22 +128,64 @@ def rename_drawings(job_number):
         if matches is None:
             continue
         prefix = matches.group(1)
-        suffix = matches.group(2)
-        extension = matches.group(3)
+        long_alphanum = matches.group(2)
+        suffix = matches.group(3)
+        extension = matches.group(4)
+
+        # If orig_filename does not have the long alphanumeric, it means file has already been renamed, skips.
+        if long_alphanum == '':
+            logging.info(f'{orig_filename} already renamed. Skipping.')
+            continue
 
         # Loop through valid files, creating a file name with customer provided format.
         counter = 1
         new_file_name = prefix + suffix + ' (' + str(counter) + ')' + extension
 
-        # If the new_file_name is an exact match for orig_filename, it means file has already been renamed, skips.
-        if new_file_name == orig_filename:
-            logging.info(f'{new_file_name} already exists. Skipping.')
-            continue
-
         # If file name already exists, appends an incrementing number just before file extension.
         while os.path.isfile(new_file_name):
             counter += 1
             new_file_name = prefix + suffix + ' (' + str(counter) + ')' + extension
+
+        # After creating the filenames, move the files.
+        logging.info(f'Renaming "{orig_filename}" TO "{new_file_name}"')
+        shutil.move(orig_filename, new_file_name)
+
+
+def rename_unlinked_drawings(abs_folder_path):
+    """ Renames files to remove long string using the given Job Number from the Customer Traveler """
+
+    logging.info(f'Renaming unlinked drawings in the following folder: {abs_folder_path}')
+    os.chdir(abs_folder_path)
+
+    # Pattern that looks for files with the provided Job_Number, drawing, and drawing filetype.
+    drawing_pattern = re.compile(rf'(.*)(_r_drawing_d_)(.*)(r_0).*(\.pdf|\.jpg|\.jpeg|\.PDF|\.JPG|\.JPEG)')
+
+    # Searches through all files in the current working directory (directory provided).
+    for orig_filename in os.listdir('.'):
+
+        # If pattern matches filename, process the filename into regex match groups.
+        matches = drawing_pattern.search(orig_filename)
+        if matches is None:
+            continue
+        part_id = matches.group(1)
+        prefix = matches.group(2)
+        long_alphanum = matches.group(3)
+        suffix = matches.group(4)
+        extension = matches.group(5)
+
+        # If orig_filename does not have the long alphanumeric, it means file has already been renamed, skips.
+        if long_alphanum == '':
+            logging.info(f'{orig_filename} already renamed. Skipping.')
+            continue
+
+        # Loop through valid files, creating a file name with customer provided format.
+        counter = 1
+        new_file_name = part_id + prefix + suffix + ' (' + str(counter) + ')' + extension
+
+        # If file name already exists, appends an incrementing number just before file extension.
+        while os.path.isfile(new_file_name):
+            counter += 1
+            new_file_name = part_id + prefix + suffix + ' (' + str(counter) + ')' + extension
 
         # After creating the filenames, move the files.
         logging.info(f'Renaming "{orig_filename}" TO "{new_file_name}"')
@@ -201,6 +244,7 @@ def main():
     folder_path = input('Please paste the absolute folder path with the files you wish to process: \n')
     logging.info(f'Getting data from the following directory: {folder_path}')
     read_document(folder_path)
+    rename_unlinked_drawings(folder_path)
 
 
 if __name__ == '__main__':
