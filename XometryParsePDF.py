@@ -118,7 +118,7 @@ def rename_drawings(job_number):
     logging.info(f'Renaming drawings for the following Job Number: {job_number}')
 
     # Pattern that looks for files with the provided Job_Number, drawing, and drawing filetype.
-    drawing_pattern = re.compile(rf'({job_number}_r_drawing_d_)(.*)(r_0).*(\.pdf|\.jpg|\.jpeg|\.PDF|\.JPG|\.JPEG)')
+    drawing_pattern = re.compile(rf'({job_number}_r_drawing_d_)(.*)(r_\w).*(\.pdf|\.jpg|\.jpeg|\.PDF|\.JPG|\.JPEG)')
 
     # Searches through all files in the current working directory (directory provided).
     for orig_filename in os.listdir('.'):
@@ -158,7 +158,7 @@ def rename_unlinked_drawings(abs_folder_path):
     os.chdir(abs_folder_path)
 
     # Pattern that looks for files with the provided Job_Number, drawing, and drawing filetype.
-    drawing_pattern = re.compile(rf'(.*)(_r_drawing_d_)(.*)(r_0).*(\.pdf|\.jpg|\.jpeg|\.PDF|\.JPG|\.JPEG)')
+    drawing_pattern = re.compile(rf'(.*)(_r_drawing_d_)(.*)(r_\w).*(\.pdf|\.jpg|\.jpeg|\.PDF|\.JPG|\.JPEG)')
 
     # Searches through all files in the current working directory (directory provided).
     for orig_filename in os.listdir('.'):
