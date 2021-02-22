@@ -285,16 +285,14 @@ def open_parse_pdf(filename):
 
 
 def main():
-    print('Press CTRL + C at anytime to exit. Closing the command line window will also work.')
-    try:
-        while True:
-            folder_path = input('Please paste the absolute folder path with the files you wish to process, or press CTRL+C to exit: \n')
-            logging.info(f'Getting data from the following directory: {folder_path}')
-            read_document(folder_path)
-            rename_unlinked_drawings(folder_path)
-            print('Folder processed, please check files to make sure everything went accordingly.')
-    except KeyboardInterrupt:
-        sys.exit()
+    print('Close the window to exit.')
+    while True:
+        folder_path = input('Please paste the absolute folder path with the files you wish to process, '
+                            'or close window to exit: \n')
+        logging.info(f'Getting data from the following directory: {folder_path}')
+        read_document(folder_path)
+        rename_unlinked_drawings(folder_path)
+        print('Folder processed, please check files to make sure everything went accordingly.')
 
 if __name__ == '__main__':
     main()
