@@ -1,6 +1,7 @@
 #!usr/bin/env python3
 # XometryParsePDF.py - script that parses PDF files from Xometry and returns certain values as a table.
 
+import sys
 import PyPDF2
 import openpyxl
 import os
@@ -287,13 +288,15 @@ def main():
     print('Press CTRL+C or close the window to exit.')
     try:
         while True:
-            folder_path = input('Please paste the absolute folder path with the files you wish to process, or press CTRL+C to exit: \n')
+            folder_path = input('Please paste the absolute folder path with the files you wish to process, '
+                                'or press CTRL+C to exit: \n')
             logging.info(f'Getting data from the following directory: {folder_path}')
             read_document(folder_path)
             rename_unlinked_drawings(folder_path)
             print('Folder processed, please check files to make sure everything went accordingly.')
     except KeyboardInterrupt:
         sys.exit()
+
 
 if __name__ == '__main__':
     main()
