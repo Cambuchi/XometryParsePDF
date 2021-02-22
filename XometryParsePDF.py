@@ -10,8 +10,8 @@ import shutil
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
-# logging.disable(logging.DEBUG)  # un/comment to un/block debug log messages
-# logging.disable(logging.INFO)  # un/comment to un/block info log messages
+# logging.disable(logging.DEBUG)  # comment to unblock debug log messages
+# logging.disable(logging.INFO)  # comment to unblock info log messages
 
 
 def read_document(abs_folder_path):
@@ -66,26 +66,67 @@ def traveler_process(filename):
     # Regex pattern, probably the part that will need editing the most to fit all traveler patterns.
     pattern = re.compile(r'''
         .*?DateContact
-        ([a-zA-Z]\w{7})                                     # PO Number
-        (\d\d/\d\d/\d\d\d\d)                                # Due Date
-        (.*?@.*?\.com)                                      # Contact
+        ([a-zA-Z]\w{7})                                     # 1 PO Number
+        (\d\d/\d\d/\d\d\d\d)                                # 2 Due Date
+        (.*?@.*?\.com)                                      # 3 Contact
         .*?
         Quantity
-        (0\w{6})                                            # Part ID
-        (.*?)                                               # Part name
-        (\.sldprt|\.SLDPRT|\.step|\.STEP|\.stp|\.STP)       # Part Name extension
+        (0\w{6})                                            # 4 Part ID
+        (.*?)                                               # 5 Part name
+        (\.sldprt|\.SLDPRT|\.step|\.STEP|\.stp|\.STP)       # 6 Part Name extension
+        .*?
+        (\d+)                                               # 7 Quantity
+        .*?
+        tions
+        (.*?[a-z])                                          # 8 Finish
+        ([A-Z\d].*?)                                        # 9 Material
+        \n
+        (.*?)                                               # 10 Certifications
+        Inspection.*?[a-z]
+        ([A-Z].*?)                                          # 11 Inspection Requirements
+        Features:
         ''', re.VERBOSE | re.DOTALL)
 
     # Open traveler with PyPDF2, this time reading everything since we know it's the document we are looking for.
     parse_string = open_parse_pdf(filename)
 
+    # Match traveler information into groups with regex
     matches = pattern.match(parse_string)
+
+    # Create dictionary and sort matches into keys for passing into traveler creation.
+    traveler_dictionary = {}
+
     logging.debug(f'PO Number is: {matches.group(1)}')
+    traveler_dictionary['po_number'] = matches.group(1)
+
     logging.debug(f'Due Date is: {matches.group(2)}')
+    traveler_dictionary['due_date'] = matches.group(2)
+
     logging.debug(f'Contact is: {matches.group(3)}')
+    traveler_dictionary['contact'] = matches.group(3)
+
+    # Passes job number into rename_drawings and rename_traveler
     logging.debug(f'Job Number is: {matches.group(4)}')
+    traveler_dictionary['job_number'] = matches.group(4)
     job_number = matches.group(4)
+
     logging.debug(f'Part File is: {matches.group(5) + matches.group(6)}')
+    traveler_dictionary['part_file'] = matches.group(5) + matches.group(6)
+
+    logging.debug(f'Quantity is: {matches.group(7)}')
+    traveler_dictionary['quantity'] = matches.group(7)
+
+    logging.debug(f'Finish is: {matches.group(8)}')
+    traveler_dictionary['finish'] = matches.group(8)
+
+    logging.debug(f'Material is: {matches.group(9)}')
+    traveler_dictionary['material'] = matches.group(9)
+
+    logging.debug(f'Certifications required are: {matches.group(10)}')
+    traveler_dictionary['certifications'] = matches.group(10)
+
+    logging.debug(f'Inspection requirements are: {matches.group(11)}')
+    traveler_dictionary['inspection'] = matches.group(11)
 
     # Rename drawings after we have the provided Job Number.
     logging.info(f'Sending {job_number} to "rename_drawings"')
@@ -152,7 +193,7 @@ def rename_drawings(job_number):
 
 
 def rename_unlinked_drawings(abs_folder_path):
-    """ Renames files to remove long string using the given Job Number from the Customer Traveler """
+    """ Renames files to remove long strings from drawing titles unrelated to Travelers/POs. """
 
     logging.info(f'Renaming unlinked drawings in the following folder: {abs_folder_path}')
     os.chdir(abs_folder_path)
@@ -226,6 +267,9 @@ def rename_traveler(original_traveler, job_number):
 
 
 def open_parse_pdf(filename):
+    """ Opens a PDF file and extracts all of the text data from every page """
+
+    # Opens the file in CWD, makes a reader object, and appends string to parse_string every time page is looped.
     pdf_file_obj = open(filename, 'rb')
     pdf_reader = PyPDF2.PdfFileReader(pdf_file_obj)
     num_pages = pdf_reader.numPages
@@ -242,13 +286,15 @@ def open_parse_pdf(filename):
 
 def main():
     print('Press CTRL + C at anytime to exit. Closing the command line window will also work.')
-    while True:
-        folder_path = input('Please paste the absolute folder path with the files you wish to process: \n')
-        logging.info(f'Getting data from the following directory: {folder_path}')
-        read_document(folder_path)
-        rename_unlinked_drawings(folder_path)
-        print('Folder processed, please check files to make sure everything went accordingly.')
-
+    try:
+        while True:
+            folder_path = input('Please paste the absolute folder path with the files you wish to process, or press CTRL+C to exit: \n')
+            logging.info(f'Getting data from the following directory: {folder_path}')
+            read_document(folder_path)
+            rename_unlinked_drawings(folder_path)
+            print('Folder processed, please check files to make sure everything went accordingly.')
+    except KeyboardInterrupt:
+        sys.exit()
 
 if __name__ == '__main__':
     main()
