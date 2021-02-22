@@ -10,8 +10,8 @@ import shutil
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
-# logging.disable(logging.DEBUG)  # comment to unblock debug log messages
-# logging.disable(logging.INFO)  # comment to unblock info log messages
+logging.disable(logging.DEBUG)  # comment to unblock debug log messages
+logging.disable(logging.INFO)  # comment to unblock info log messages
 
 
 def read_document(abs_folder_path):
@@ -79,9 +79,8 @@ def traveler_process(filename):
         .*?
         tions
         (.*?[a-z])                                          # 8 Finish
-        ([A-Z\d].*?)                                        # 9 Material
-        \n
-        (.*?)                                               # 10 Certifications
+        (\n?[A-Z\d].*?)                                     # 9 Material
+        (Cert.*?)                                           # 10 Certifications
         Inspection.*?[a-z]
         ([A-Z].*?)                                          # 11 Inspection Requirements
         Features:
@@ -285,14 +284,16 @@ def open_parse_pdf(filename):
 
 
 def main():
-    print('Close the window to exit.')
-    while True:
-        folder_path = input('Please paste the absolute folder path with the files you wish to process, '
-                            'or close window to exit: \n')
-        logging.info(f'Getting data from the following directory: {folder_path}')
-        read_document(folder_path)
-        rename_unlinked_drawings(folder_path)
-        print('Folder processed, please check files to make sure everything went accordingly.')
+    print('Press CTRL+C or close the window to exit.')
+    try:
+        while True:
+            folder_path = input('Please paste the absolute folder path with the files you wish to process, or press CTRL+C to exit: \n')
+            logging.info(f'Getting data from the following directory: {folder_path}')
+            read_document(folder_path)
+            rename_unlinked_drawings(folder_path)
+            print('Folder processed, please check files to make sure everything went accordingly.')
+    except KeyboardInterrupt:
+        sys.exit()
 
 if __name__ == '__main__':
     main()
