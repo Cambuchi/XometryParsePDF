@@ -8,6 +8,7 @@ import os
 import logging
 import re
 import shutil
+from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
@@ -84,7 +85,7 @@ def traveler_process(filename):
         (Cert.*?)                                           # 10 Certifications
         Inspection.*?[a-z]
         ([A-Z].*?)                                          # 11 Inspection Requirements
-        Features:
+        (Features:.*)                                       # 12 Notes
         ''', re.VERBOSE | re.DOTALL)
 
     # Open traveler with PyPDF2, this time reading everything since we know it's the document we are looking for.
@@ -128,6 +129,9 @@ def traveler_process(filename):
     logging.debug(f'Inspection requirements are: {matches.group(11)}')
     traveler_dictionary['inspection'] = matches.group(11)
 
+    logging.debug(f'Notes are: {matches.group(12)}')
+    traveler_dictionary['notes'] = matches.group(12)
+
     # Rename drawings after we have the provided Job Number.
     logging.info(f'Sending {job_number} to "rename_drawings"')
     rename_drawings(job_number)
@@ -135,6 +139,10 @@ def traveler_process(filename):
     # Rename travelers after we have the provided Job Number and Traveler filename.
     logging.info(f'Sending {filename} and {job_number} to "rename_traveler"')
     rename_traveler(filename, job_number)
+
+    logging.info(f'traveler_dictionary contains the following: \n{traveler_dictionary}')
+    logging.info(f'Sending traveler information to create_excel.')
+    create_excel(traveler_dictionary, os.getcwd())
 
 
 def purchase_order_process(filename):
@@ -264,6 +272,82 @@ def rename_traveler(original_traveler, job_number):
             # Rename the file.
             logging.info(f'Renaming "{original_traveler}" TO "{new_file_name}"')
             shutil.move(original_traveler, new_file_name)
+
+
+def create_excel(traveler_dictionary, folder_path):
+    script_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    os.chdir(script_path)
+    wb = openpyxl.load_workbook('TravelerTemplate.xlsx')
+    sheet = wb['Sheet1']
+    sheet['A1'] = f'CT {traveler_dictionary["job_number"]}'
+    sheet['A6'] = traveler_dictionary['po_number']
+    sheet['B6'] = traveler_dictionary['due_date']
+    sheet['C6'] = 'CUSTOMER'
+    sheet['A8'] = traveler_dictionary['job_number']
+    sheet['B8'] = traveler_dictionary['part_file']
+    sheet['C8'] = traveler_dictionary['quantity']
+    sheet['A10'] = traveler_dictionary['finish'].strip('\n')
+    sheet['B10'] = traveler_dictionary['material'].strip('\n')
+    sheet['C10'] = traveler_dictionary['certifications'].strip('\n')
+    sheet['A12'] = traveler_dictionary['inspection'].strip('\n')
+
+    # Replace all of Xometry mentions with 'CUSTOMER'
+    sheet['A14'] = re.sub(r'xometry|Xometry|XOMETRY', 'CUSTOMER', traveler_dictionary['notes'].strip('\n'))
+
+    # Date modifications according to customer instructions
+    date = traveler_dictionary['due_date']
+    date_time_obj = datetime.strptime(date, "%m/%d/%Y")
+
+    # 1) If “Finish” block says “Standard”, change due date to two business days before current due date.
+    if traveler_dictionary['finish'] == 'Standard':
+        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=2):%m/%d/%Y}'
+
+    # 2) If anything in the pdf mentions “mask” or “masking”, “heat treat”, “heat treating”, “harden”,
+    # or “through harden” change due date to 7 business days before current due date
+    post_process_pattern = re.compile(r'(mask|masking|heat treat|heat treating|harden|through harden)')
+    matches = post_process_pattern.search(traveler_dictionary['finish'])
+    if matches is not None:
+        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
+    matches = post_process_pattern.search(traveler_dictionary['material'])
+    if matches is not None:
+        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
+    matches = post_process_pattern.search(traveler_dictionary['notes'])
+    if matches is not None:
+        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
+
+    # 3) If “Finish” block says “Custom” but there’s no mention of masking in rest of pdf,
+    # change due date to 5 business days before current due date
+    finish_pattern = re.compile(r'custom|CUSTOM|Custom')
+    mask_pattern = re.compile(r'mask|MASK|masking|MASKING')
+    finish_matches = finish_pattern.search(traveler_dictionary['finish'])
+    if finish_matches is not None:
+        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
+        mask_matches = mask_pattern.search(traveler_dictionary['finish'])
+        if mask_matches is not None:
+            sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
+        mask_matches = mask_pattern.search(traveler_dictionary['material'])
+        if mask_matches is not None:
+            sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
+        mask_matches = mask_pattern.search(traveler_dictionary['notes'])
+        if mask_matches is not None:
+            sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
+        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=5):%m/%d/%Y}'
+
+    # 4) If the pdf is absent of any of the phrases in a,b or c and “Finish” block mentions any other kind of finish,
+    # change due date to three business days before current due date.
+    elif traveler_dictionary['finish'] is not None:
+        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=5):%m/%d/%Y}'
+
+    # 5) If in following the rules, the resulting date is less than today’s date,
+    # replace the date with the text “ASAP”
+    compare_today = sheet['B6'].value
+    compare_time_obj = datetime.strptime(compare_today, "%m/%d/%Y")
+    if compare_time_obj.date() < datetime.today().date():
+        sheet['B6'] = 'ASAP'
+
+    # Change to folder path of the traveler file to save new excel file.
+    os.chdir(folder_path)
+    wb.save(f'CT {traveler_dictionary["job_number"]}.xlsx')
 
 
 def open_parse_pdf(filename):
