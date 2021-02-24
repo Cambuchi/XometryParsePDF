@@ -12,8 +12,8 @@ from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
-logging.disable(logging.DEBUG)  # comment to unblock debug log messages
-logging.disable(logging.INFO)  # comment to unblock info log messages
+# logging.disable(logging.DEBUG)  # comment to unblock debug log messages
+# logging.disable(logging.INFO)  # comment to unblock info log messages
 
 
 def read_document(abs_folder_path):
@@ -75,7 +75,7 @@ def traveler_process(filename):
         Quantity
         (0\w{6})                                            # 4 Part ID
         (.*?)                                               # 5 Part name
-        (\.sldprt|\.SLDPRT|\.step|\.STEP|\.stp|\.STP)       # 6 Part Name extension
+        (\.sldprt|\.SLDPRT|\.step|\.STEP|\.stp|\.STP|\.x_t|\.s\n?tp)       # 6 Part Name extension
         .*?
         (\d+)                                               # 7 Quantity
         .*?
@@ -284,7 +284,7 @@ def create_excel(traveler_dictionary, folder_path):
     sheet['B6'] = traveler_dictionary['due_date']
     sheet['C6'] = 'CUSTOMER'
     sheet['A8'] = traveler_dictionary['job_number']
-    sheet['B8'] = traveler_dictionary['part_file']
+    sheet['B8'] = traveler_dictionary['part_file'].strip('\n')
     sheet['C8'] = traveler_dictionary['quantity']
     sheet['A10'] = traveler_dictionary['finish'].strip('\n')
     sheet['B10'] = traveler_dictionary['material'].strip('\n')
@@ -333,7 +333,7 @@ def create_excel(traveler_dictionary, folder_path):
             sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
         sheet['B6'] = f'{date_time_obj.date() - timedelta(days=5):%m/%d/%Y}'
 
-    # 4) If the pdf is absent of any of the phrases in a,b or c and “Finish” block mentions any other kind of finish,
+    # 4) If the pdf is absent of any of the phrases in a,b, or c and “Finish” block mentions any other kind of finish,
     # change due date to three business days before current due date.
     elif traveler_dictionary['finish'] is not None:
         sheet['B6'] = f'{date_time_obj.date() - timedelta(days=5):%m/%d/%Y}'
