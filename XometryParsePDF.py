@@ -277,7 +277,7 @@ def rename_traveler(original_traveler, job_number):
 def create_excel(traveler_dictionary, folder_path):
     script_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     os.chdir(script_path)
-    wb = openpyxl.load_workbook('TravelerTemplate.xlsx')
+    wb = openpyxl.load_workbook(resource_path('templates/TravelerTemplate.xlsx'))
     sheet = wb['Sheet1']
     sheet['A1'] = f'CT {traveler_dictionary["job_number"]}'
     sheet['A6'] = traveler_dictionary['po_number']
@@ -365,7 +365,19 @@ def open_parse_pdf(filename):
     # Close the document after getting all the information.
     pdf_file_obj.close()
     logging.debug(f'parse_string is: \n{parse_string}')
+
     return parse_string
+
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 def main():
