@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 pypdf2 = "*"
 openpyxl = "*"
+pillow = "*"
+numpy = "*"
 
 [dev-packages]
 

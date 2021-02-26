@@ -1,5 +1,7 @@
 #!usr/bin/env python3
 # XometryParsePDF.py - script that parses PDF files from Xometry and returns certain values as a table.
+# command to package as an executable file:
+# pyinstaller --onefile --add-data="templates/TravelerTemplate.xlsx;templates" XometryParsePDF.py
 
 import sys
 import PyPDF2
@@ -8,12 +10,17 @@ import os
 import logging
 import re
 import shutil
+import numpy as np
 from datetime import datetime, timedelta
+from PIL import Image
+from openpyxl.drawing.spreadsheet_drawing import AbsoluteAnchor
+from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
+from openpyxl.utils.units import pixels_to_EMU, cm_to_EMU
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
-# logging.disable(logging.DEBUG)  # comment to unblock debug log messages
-# logging.disable(logging.INFO)  # comment to unblock info log messages
+logging.disable(logging.DEBUG)  # comment to unblock debug log messages
+logging.disable(logging.INFO)  # comment to unblock info log messages
 
 
 def read_document(abs_folder_path):
@@ -110,6 +117,9 @@ def traveler_process(filename):
     logging.debug(f'Job Number is: {matches.group(4)}')
     traveler_dictionary['job_number'] = matches.group(4)
     job_number = matches.group(4)
+
+    # Sends filepath and job_number to grab image from pdf
+    image_grab(filename, job_number)
 
     logging.debug(f'Part File is: {matches.group(5) + matches.group(6)}')
     traveler_dictionary['part_file'] = matches.group(5) + matches.group(6)
@@ -345,15 +355,89 @@ def create_excel(traveler_dictionary, folder_path):
     if compare_time_obj.date() < datetime.today().date():
         sheet['B6'] = 'ASAP'
 
-    # Change to folder path of the traveler file to save new excel file.
+    # Change to folder path to grab image and save excel file.
     os.chdir(folder_path)
+    im = Image.open(f'{traveler_dictionary["job_number"]}.png')
+    im = im.convert('RGBA')
+
+    data = np.array(im)  # "data" is a height x width x 4 numpy array
+    red, green, blue, alpha = data.T  # Temporarily unpack the bands for readability
+
+    # Replace white with red... (leaves alpha values alone...)
+    black_areas = (red == 0) & (blue == 0) & (green == 0)
+    data[..., :-1][black_areas.T] = (255, 255, 255)  # Transpose back needed
+
+    im2 = Image.fromarray(data)
+    im.close()
+    im2.save(f'{traveler_dictionary["job_number"]}.png')
+
+    im = Image.open(f'{traveler_dictionary["job_number"]}.png')
+    resized_im = im.resize((round(im.size[0]*0.75), round(im.size[1]*0.75)))
+    resized_im.save(f'{traveler_dictionary["job_number"]}.png')
+
+    img = openpyxl.drawing.image.Image(f'{traveler_dictionary["job_number"]}.png')
+    p2e = pixels_to_EMU
+    h, w = img.height, img.width
+    position = XDRPoint2D(p2e(210), p2e(80))
+    size = XDRPositiveSize2D(p2e(h), p2e(w))
+    img.anchor = AbsoluteAnchor(pos=position, ext=size)
+
+    # img.anchor = 'A2'
+
+    sheet.add_image(img)
     wb.save(f'CT {traveler_dictionary["job_number"]}.xlsx')
+
+
+def image_grab(pdf, job_number):
+    pdf_obj = open(pdf, 'rb')
+    input1 = PyPDF2.PdfFileReader(pdf_obj)
+    page0 = input1.getPage(0)
+
+    if '/XObject' in page0['/Resources']:
+        xObject = page0['/Resources']['/XObject'].getObject()
+
+        for obj in xObject:
+            if xObject[obj]['/Subtype'] == '/Image':
+                size = (xObject[obj]['/Width'], xObject[obj]['/Height'])
+                data = xObject[obj].getData()
+                if xObject[obj]['/ColorSpace'] == '/DeviceRGB':
+                    mode = "RGB"
+                else:
+                    mode = "P"
+
+                if '/Filter' in xObject[obj]:
+                    if xObject[obj]['/Filter'] == '/FlateDecode':
+                        img = Image.frombytes(mode, size, data)
+                        if img.height > 100:
+                            img.save(str(job_number) + ".png")
+                            # img.save(str(job_number) + ' ' + obj[1:] + ".png")
+                    elif xObject[obj]['/Filter'] == '/DCTDecode':
+                        img = open(obj[1:] + ".jpg", "wb")
+                        img.write(data)
+                        img.close()
+                    elif xObject[obj]['/Filter'] == '/JPXDecode':
+                        img = open(obj[1:] + ".jp2", "wb")
+                        img.write(data)
+                        img.close()
+                    elif xObject[obj]['/Filter'] == '/CCITTFaxDecode':
+                        img = open(obj[1:] + ".tiff", "wb")
+                        img.write(data)
+                        img.close()
+                else:
+                    img = Image.frombytes(mode, size, data)
+                    if img.height > 100:
+                        img.save(str(job_number) + ".png")
+                        # img.save(str(job_number) + ' ' + obj[1:] + ".png")
+    else:
+        print("No image found.")
+    pdf_obj.close()
+
 
 
 def open_parse_pdf(filename):
     """ Opens a PDF file and extracts all of the text data from every page """
 
-    # Opens the file in CWD, makes a reader object, and appends string to parse_string every time page is looped.
+    # Opens the file in cwd, makes a reader object, and appends string to parse_string every time page is looped.
     pdf_file_obj = open(filename, 'rb')
     pdf_reader = PyPDF2.PdfFileReader(pdf_file_obj)
     num_pages = pdf_reader.numPages
