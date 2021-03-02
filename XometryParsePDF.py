@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from PIL import Image
 from openpyxl.drawing.spreadsheet_drawing import AbsoluteAnchor
 from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
-from openpyxl.utils.units import pixels_to_EMU, cm_to_EMU
+from openpyxl.utils.units import pixels_to_EMU
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
@@ -419,33 +419,33 @@ def image_grab(pdf, job_number):
 
     # Parse the PDF for iamge filetypes and saves them to the same directory.
     if '/XObject' in page0['/Resources']:
-        xObject = page0['/Resources']['/XObject'].getObject()
+        xobject = page0['/Resources']['/XObject'].getObject()
 
-        for obj in xObject:
-            if xObject[obj]['/Subtype'] == '/Image':
-                size = (xObject[obj]['/Width'], xObject[obj]['/Height'])
-                data = xObject[obj].getData()
-                if xObject[obj]['/ColorSpace'] == '/DeviceRGB':
+        for obj in xobject:
+            if xobject[obj]['/Subtype'] == '/Image':
+                size = (xobject[obj]['/Width'], xobject[obj]['/Height'])
+                data = xobject[obj].getData()
+                if xobject[obj]['/ColorSpace'] == '/DeviceRGB':
                     mode = "RGB"
                 else:
                     mode = "P"
 
                 # Filter for image sizes to avoid processing the customer logo image as well.
-                if '/Filter' in xObject[obj]:
-                    if xObject[obj]['/Filter'] == '/FlateDecode':
+                if '/Filter' in xobject[obj]:
+                    if xobject[obj]['/Filter'] == '/FlateDecode':
                         img = Image.frombytes(mode, size, data)
                         if img.height > 100:
                             img.save(str(job_number) + ".png")
                             # img.save(str(job_number) + ' ' + obj[1:] + ".png")
-                    elif xObject[obj]['/Filter'] == '/DCTDecode':
+                    elif xobject[obj]['/Filter'] == '/DCTDecode':
                         img = open(obj[1:] + ".jpg", "wb")
                         img.write(data)
                         img.close()
-                    elif xObject[obj]['/Filter'] == '/JPXDecode':
+                    elif xobject[obj]['/Filter'] == '/JPXDecode':
                         img = open(obj[1:] + ".jp2", "wb")
                         img.write(data)
                         img.close()
-                    elif xObject[obj]['/Filter'] == '/CCITTFaxDecode':
+                    elif xobject[obj]['/Filter'] == '/CCITTFaxDecode':
                         img = open(obj[1:] + ".tiff", "wb")
                         img.write(data)
                         img.close()
