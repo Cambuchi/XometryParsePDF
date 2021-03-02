@@ -19,8 +19,8 @@ from openpyxl.utils.units import pixels_to_EMU, cm_to_EMU
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
-logging.disable(logging.DEBUG)  # comment to unblock debug log messages
-logging.disable(logging.INFO)  # comment to unblock info log messages
+logging.disable(logging.DEBUG)  # uncomment to view debug log messages
+logging.disable(logging.INFO)  # uncomment to view info log messages
 
 
 def read_document(abs_folder_path):
@@ -122,7 +122,7 @@ def traveler_process(filename):
     image_grab(filename, job_number)
 
     logging.debug(f'Part File is: {matches.group(5) + matches.group(6)}')
-    traveler_dictionary['part_file'] = matches.group(5) + matches.group(6)
+    traveler_dictionary['part_file'] = remove_newlines(matches.group(5) + matches.group(6))
 
     logging.debug(f'Quantity is: {matches.group(7)}')
     traveler_dictionary['quantity'] = matches.group(7)
@@ -134,10 +134,10 @@ def traveler_process(filename):
     traveler_dictionary['material'] = matches.group(9)
 
     logging.debug(f'Certifications required are: {matches.group(10)}')
-    traveler_dictionary['certifications'] = matches.group(10)
+    traveler_dictionary['certifications'] = regex_certificate_check(low_up(remove_newlines(matches.group(10))))
 
     logging.debug(f'Inspection requirements are: {matches.group(11)}')
-    traveler_dictionary['inspection'] = matches.group(11)
+    traveler_dictionary['inspection'] = low_up(remove_newlines(matches.group(11)))
 
     logging.debug(f'Notes are: {matches.group(12)}')
     traveler_dictionary['notes'] = matches.group(12)
@@ -285,9 +285,18 @@ def rename_traveler(original_traveler, job_number):
 
 
 def create_excel(traveler_dictionary, folder_path):
+    """
+    Creates an excel template that mimics the customer traveler so that we can pass in information from the PDF.
+    :param traveler_dictionary: dictionary with information from traveler sorted by category.
+    :param folder_path: path to the directory directly containing the traveler
+    :return: None
+    """
+    # Gets the directory of the executable script, which contains the template we will open.
     script_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     os.chdir(script_path)
     wb = openpyxl.load_workbook(resource_path('templates/TravelerTemplate.xlsx'))
+
+    # Transfer the traveler dictionary values into the excel template.
     sheet = wb['Sheet1']
     sheet['A1'] = f'CT {traveler_dictionary["job_number"]}'
     sheet['A6'] = traveler_dictionary['po_number']
@@ -331,7 +340,7 @@ def create_excel(traveler_dictionary, folder_path):
     mask_pattern = re.compile(r'mask|MASK|masking|MASKING')
     finish_matches = finish_pattern.search(traveler_dictionary['finish'])
     if finish_matches is not None:
-        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
+        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=5):%m/%d/%Y}'
         mask_matches = mask_pattern.search(traveler_dictionary['finish'])
         if mask_matches is not None:
             sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
@@ -341,12 +350,11 @@ def create_excel(traveler_dictionary, folder_path):
         mask_matches = mask_pattern.search(traveler_dictionary['notes'])
         if mask_matches is not None:
             sheet['B6'] = f'{date_time_obj.date() - timedelta(days=7):%m/%d/%Y}'
-        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=5):%m/%d/%Y}'
 
     # 4) If the pdf is absent of any of the phrases in a,b, or c and “Finish” block mentions any other kind of finish,
     # change due date to three business days before current due date.
     elif traveler_dictionary['finish'] is not None:
-        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=5):%m/%d/%Y}'
+        sheet['B6'] = f'{date_time_obj.date() - timedelta(days=3):%m/%d/%Y}'
 
     # 5) If in following the rules, the resulting date is less than today’s date,
     # replace the date with the text “ASAP”
@@ -357,42 +365,59 @@ def create_excel(traveler_dictionary, folder_path):
 
     # Change to folder path to grab image and save excel file.
     os.chdir(folder_path)
+
+    # Opens image and converts to RGBA format
     im = Image.open(f'{traveler_dictionary["job_number"]}.png')
     im = im.convert('RGBA')
 
+    # Uses numpy to convert img background to white
     data = np.array(im)  # "data" is a height x width x 4 numpy array
     red, green, blue, alpha = data.T  # Temporarily unpack the bands for readability
 
-    # Replace white with red... (leaves alpha values alone...)
+    # Replace black with white... (leaves alpha values alone...)
     black_areas = (red == 0) & (blue == 0) & (green == 0)
     data[..., :-1][black_areas.T] = (255, 255, 255)  # Transpose back needed
 
+    # Closes original image, than saves new image with white background
     im2 = Image.fromarray(data)
     im.close()
     im2.save(f'{traveler_dictionary["job_number"]}.png')
 
+    # Opens image and resizes it to fit the template.
     im = Image.open(f'{traveler_dictionary["job_number"]}.png')
     resized_im = im.resize((round(im.size[0]*0.75), round(im.size[1]*0.75)))
     resized_im.save(f'{traveler_dictionary["job_number"]}.png')
 
+    # Anchors the image in the template excel according to absolute values to horizontally align center.
     img = openpyxl.drawing.image.Image(f'{traveler_dictionary["job_number"]}.png')
     p2e = pixels_to_EMU
     h, w = img.height, img.width
     position = XDRPoint2D(p2e(210), p2e(80))
     size = XDRPositiveSize2D(p2e(h), p2e(w))
     img.anchor = AbsoluteAnchor(pos=position, ext=size)
-
-    # img.anchor = 'A2'
-
     sheet.add_image(img)
+
+    # Saves the template file as the new traveler name. Customer can now open and print as PDF.
     wb.save(f'CT {traveler_dictionary["job_number"]}.xlsx')
+
+    # Deletes the image file since we no longer need it.
+    os.remove(f'{traveler_dictionary["job_number"]}.png')
 
 
 def image_grab(pdf, job_number):
+    """
+    Grabs the preview image from the PDF for later processing into the template excel traveler.
+    :param pdf: the filename of the traveler to grab image from
+    :param job_number: the job number used to name the image file
+    :return: None
+    """
+
+    # Open the PDF, only parse the first page since that has the preview image.
     pdf_obj = open(pdf, 'rb')
     input1 = PyPDF2.PdfFileReader(pdf_obj)
     page0 = input1.getPage(0)
 
+    # Parse the PDF for iamge filetypes and saves them to the same directory.
     if '/XObject' in page0['/Resources']:
         xObject = page0['/Resources']['/XObject'].getObject()
 
@@ -405,6 +430,7 @@ def image_grab(pdf, job_number):
                 else:
                     mode = "P"
 
+                # Filter for image sizes to avoid processing the customer logo image as well.
                 if '/Filter' in xObject[obj]:
                     if xObject[obj]['/Filter'] == '/FlateDecode':
                         img = Image.frombytes(mode, size, data)
@@ -427,11 +453,34 @@ def image_grab(pdf, job_number):
                     img = Image.frombytes(mode, size, data)
                     if img.height > 100:
                         img.save(str(job_number) + ".png")
-                        # img.save(str(job_number) + ' ' + obj[1:] + ".png")
+
     else:
         print("No image found.")
     pdf_obj.close()
 
+
+def remove_newlines(string):
+    """ Remove new lines from a string. """
+    new_string = string.replace('\n', '')
+    return new_string
+
+
+def low_up(string):
+    """ Insert space between lowercase letters against uppercase letters. """
+    new_string = re.sub(r'([a-z](?=[A-Z])|[A-Z](?=[A-Z][a-z]))', r'\1 ', string)
+    return new_string
+
+
+def remove_l_stroke(string):
+    """ Remove L stroke character that gets parsed by the PyPDF2 for bullets. """
+    new_string = re.sub(r'Ł', '', string)
+    return new_string
+
+
+def regex_certificate_check(string):
+    """ Check for 'certicate/certication' since PyPDF2 has a hard time parsing the kerning in certificate. """
+    new_string = re.sub(r'(certic|Certic)', 'Certific', string)
+    return new_string
 
 
 def open_parse_pdf(filename):
@@ -450,7 +499,7 @@ def open_parse_pdf(filename):
     pdf_file_obj.close()
     logging.debug(f'parse_string is: \n{parse_string}')
 
-    return parse_string
+    return remove_l_stroke(parse_string)
 
 
 def resource_path(relative_path):
