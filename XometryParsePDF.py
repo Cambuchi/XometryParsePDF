@@ -75,24 +75,24 @@ def traveler_process(filename):
     # Regex pattern, probably the part that will need editing the most to fit all traveler patterns.
     pattern = re.compile(r'''
         .*?DateContact
-        ([a-zA-Z]\w{7})                                     # 1 PO Number
-        (\d\d/\d\d/\d\d\d\d)                                # 2 Due Date
-        (.*?@.*?\.com)                                      # 3 Contact
+        ([a-zA-Z]\w{7})\n?                                                  # 1 PO Number
+        (\d\d/\d\d/\d\d\d\d)                                                # 2 Due Date
+        (.*?@.*?\.com)                                                      # 3 Contact
         .*?
         Quantity
-        (0\w{6})                                            # 4 Part ID
-        (.*?)                                               # 5 Part name
-        (\.sldprt|\.SLDPRT|\.step|\.STEP|\.stp|\.STP|\.x_t|\.s\n?tp)       # 6 Part Name extension
+        (0\w{6})                                                            # 4 Part ID
+        (.*?)                                                               # 5 Part name
+        (\.\n?sldprt|\.\n?SLDPRT|\.\n?step|\.\n?STEP|\.\n?stp|\.\n?STP|\.\n?x_t|\.\n?s\n?tp)        # 6 Part Name extension
         .*?
-        (\d+)                                               # 7 Quantity
+        (\d+)                                                               # 7 Quantity
         .*?
         tions
-        (.*?[a-z])                                          # 8 Finish
-        (\n?[A-Z\d].*?)                                     # 9 Material
-        (Cert.*?)                                           # 10 Certifications
+        (.*?[a-z])                                                          # 8 Finish
+        (\n?[A-Z\d].*?)                                                     # 9 Material
+        (Cert.*?)                                                           # 10 Certifications
         Inspection.*?[a-z]
-        ([A-Z].*?)                                          # 11 Inspection Requirements
-        (Features:.*)                                       # 12 Notes
+        ([A-Z].*?)                                                          # 11 Inspection Requirements
+        (Features:.*)                                                       # 12 Notes
         ''', re.VERBOSE | re.DOTALL)
 
     # Open traveler with PyPDF2, this time reading everything since we know it's the document we are looking for.
