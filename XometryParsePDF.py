@@ -16,6 +16,7 @@ from PIL import Image
 from openpyxl.drawing.spreadsheet_drawing import AbsoluteAnchor
 from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
 from openpyxl.utils.units import pixels_to_EMU
+from win32com import client
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
@@ -82,7 +83,7 @@ def traveler_process(filename):
         Quantity
         (0\w{6})                                                            # 4 Part ID
         (.*?)                                                               # 5 Part name
-        (\.\n?sldprt|\.\n?SLDPRT|\.\n?step|\.\n?STEP|\.\n?stp|\.\n?STP|\.\n?x_t|\.\n?s\n?tp)        # 6 Part Name extension
+        (\.\n?sldprt|\.\n?SLDPRT|\.\n?step|\.\n?STEP|\.\n?stp|\.\n?STP|\.\n?x_t|\.\n?s\n?tp)        # 6 Extension
         .*?
         (\d+)                                                               # 7 Quantity
         .*?
@@ -459,6 +460,31 @@ def image_grab(pdf, job_number):
     pdf_obj.close()
 
 
+def excel_to_pdf(folder_path):
+    """ Goes through all files in a folder that are excel files, appends '_m' and saves as PDF format. """
+    os.chdir(folder_path)
+    for file in os.listdir('.'):
+        if file.endswith('.xlsx'):
+            logging.debug(f'Converting {file} from excel to PDF.')
+
+            output_file = file.split('.')[0] + '_m.pdf'
+            logging.debug(f'File name will be {output_file}')
+
+            app = client.DispatchEx("Excel.Application")
+            app.Interactive = False
+            app.Visible = False
+            workbook = app.Workbooks.Open(folder_path + '\\' + file)
+            try:
+                workbook.ActiveSheet.ExportAsFixedFormat(0, folder_path + '\\' + output_file)
+            except Exception as e:
+                print("Failed to convert in PDF format.")
+                print(str(e))
+            finally:
+                workbook.Close(False)
+                app.Quit()
+                workbook = None
+
+
 def remove_newlines(string):
     """ Remove new lines from a string. """
     new_string = string.replace('\n', '')
@@ -522,6 +548,7 @@ def main():
             logging.info(f'Getting data from the following directory: {folder_path}')
             read_document(folder_path)
             rename_unlinked_drawings(folder_path)
+            excel_to_pdf(folder_path)
             print('Folder processed, please check files to make sure everything went accordingly.')
     except KeyboardInterrupt:
         sys.exit()

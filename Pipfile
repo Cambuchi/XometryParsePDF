@@ -8,6 +8,7 @@ pypdf2 = "*"
 openpyxl = "*"
 pillow = "*"
 numpy = "*"
+pypiwin32 = "*"
 
 [dev-packages]
 
