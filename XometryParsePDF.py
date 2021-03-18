@@ -20,8 +20,8 @@ from win32com import client
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
-logging.disable(logging.DEBUG)  # uncomment to view debug log messages
-logging.disable(logging.INFO)  # uncomment to view info log messages
+# logging.disable(logging.DEBUG)  # uncomment to view debug log messages
+# logging.disable(logging.INFO)  # uncomment to view info log messages
 
 
 def read_document(abs_folder_path):
@@ -129,7 +129,7 @@ def traveler_process(filename):
     traveler_dictionary['quantity'] = matches.group(7)
 
     logging.debug(f'Finish is: {matches.group(8)}')
-    traveler_dictionary['finish'] = matches.group(8)
+    traveler_dictionary['finish'] = regex_film_check(matches.group(8))
 
     logging.debug(f'Material is: {matches.group(9)}')
     traveler_dictionary['material'] = matches.group(9)
@@ -288,8 +288,8 @@ def rename_traveler(original_traveler, job_number):
 def create_excel(traveler_dictionary, folder_path):
     """
     Creates an excel template that mimics the customer traveler so that we can pass in information from the PDF.
-    :param traveler_dictionary: dictionary with information from traveler sorted by category.
-    :param folder_path: path to the directory directly containing the traveler
+    :traveler_dictionary: dictionary with information from traveler sorted by category.
+    :folder_path: path to the directory directly containing the traveler
     :return: None
     """
     # Gets the directory of the executable script, which contains the template we will open.
@@ -312,7 +312,11 @@ def create_excel(traveler_dictionary, folder_path):
     sheet['A12'] = traveler_dictionary['inspection'].strip('\n')
 
     # Replace all of Xometry mentions with 'CUSTOMER'
-    sheet['A14'] = re.sub(r'xometry|Xometry|XOMETRY', 'CUSTOMER', traveler_dictionary['notes'].strip('\n'))
+    no_customer = re.sub(r'xometry|Xometry|XOMETRY', 'CUSTOMER', traveler_dictionary['notes'].strip('\n'))
+    no_trademark = replace_trademark(no_customer)
+    no_fluid = replace_fluid(no_trademark)
+    final_notes = process_notes(no_fluid)
+    sheet['A14'] = final_notes
 
     # Date modifications according to customer instructions
     date = traveler_dictionary['due_date']
@@ -408,8 +412,8 @@ def create_excel(traveler_dictionary, folder_path):
 def image_grab(pdf, job_number):
     """
     Grabs the preview image from the PDF for later processing into the template excel traveler.
-    :param pdf: the filename of the traveler to grab image from
-    :param job_number: the job number used to name the image file
+    :pdf: the filename of the traveler to grab image from
+    :job_number: the job number used to name the image file
     :return: None
     """
 
@@ -485,6 +489,47 @@ def excel_to_pdf(folder_path):
                 workbook = None
 
 
+def process_notes(string):
+    """ Processes incoming string for 'Notes' section with a bunch of specific Regex because reading PDFs is messy """
+    logging.debug(f'Notes to process: \n{string}')
+    new_string = ''
+
+    thread_pattern = re.compile(r'(Threads/Tapped Holes: \n)(\d+)', re.DOTALL)
+    tolerance_pattern = re.compile(r'Tolerances: \n(.*?)\n', re.DOTALL)
+    roughness_pattern = re.compile(r'.*Surface Roughness: \n.*?ish (\d.*?)(?:Ra, )(speci\nc area|entire part).*?(?:Part|Notes).*', re.DOTALL)
+    marking_pattern = re.compile(r'Part Markings: \n(.*?)Notes:', re.DOTALL)
+    main_notes_pattern = re.compile(r'Notes:(.*)', re.DOTALL)
+
+    thread_matches = thread_pattern.search(string)
+    logging.debug(f'thread_matches: {thread_matches}')
+    tolerance_matches = tolerance_pattern.search(string)
+    logging.debug(f'tolerance_matches: {tolerance_matches}')
+    roughness_matches = roughness_pattern.search(string)
+    logging.debug(f'roughness_matches: {roughness_matches}')
+    marking_matches = marking_pattern.search(string)
+    logging.debug(f'marking_matches: {marking_matches}')
+    main_matches = main_notes_pattern.search(string)
+    logging.debug(f'main_matches: {main_matches}')
+
+    if thread_matches is not None:
+        new_string += 'Threads/Tapped Holes: ' + remove_newlines(thread_matches.group(2)) + '\n'
+        logging.debug(f'current new string after thread_matches: \n{new_string}')
+    if tolerance_matches is not None:
+        new_string += 'Tolerances: ' + remove_newlines(tolerance_matches.group(1)) + '\n'
+        logging.debug(f'current new string after tolerance_matches: \n{new_string}')
+    if roughness_matches is not None:
+        new_string += 'Surface Roughness: ' + remove_newlines(roughness_matches.group(1)) + ' Ra, ' + regex_specic_check(remove_newlines(roughness_matches.group(2))) + '\n'
+        logging.debug(f'current new string after roughness_matches: \n{new_string}')
+    if marking_matches is not None:
+        new_string += 'Part Markings: ' + remove_newlines(marking_matches.group(1)) + '\n'
+        logging.debug(f'current new string after marking_matches: \n{new_string}')
+    if main_matches is not None:
+        new_string += 'Notes: ' + main_matches.group(1)
+        logging.debug(f'current new string after main_matches: \n{new_string}')
+
+    return new_string
+
+
 def remove_newlines(string):
     """ Remove new lines from a string. """
     new_string = string.replace('\n', '')
@@ -503,9 +548,33 @@ def remove_l_stroke(string):
     return new_string
 
 
+def replace_trademark(string):
+    """ Replace trademark character for apostrophe. """
+    new_string = re.sub(r'™', '\'', string)
+    return new_string
+
+
+def replace_fluid(string):
+    """ Replace fluid character for double apostrophe. """
+    new_string = re.sub(r'ﬂ', '\"', string)
+    return new_string
+
+
 def regex_certificate_check(string):
     """ Check for 'certicate/certication' since PyPDF2 has a hard time parsing the kerning in certificate. """
     new_string = re.sub(r'(certic|Certic)', 'Certific', string)
+    return new_string
+
+
+def regex_specic_check(string):
+    """ Check for 'specic' since PyPDF2 has a hard time parsing the kerning in specific. """
+    new_string = re.sub(r'specic', 'specific', string)
+    return new_string
+
+
+def regex_film_check(string):
+    """ Check for 'Chem-lm' since PyPDF2 has a hard time parsing the kerning in Chem-film. """
+    new_string = re.sub(r'Chem-lm', 'Chem-Film', string)
     return new_string
 
 
