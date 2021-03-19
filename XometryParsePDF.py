@@ -506,6 +506,7 @@ def process_notes(string):
     new_string = ''
 
     thread_pattern = re.compile(r'(Threads/Tapped Holes: \n)(\d+)', re.DOTALL)
+    insert_pattern = re.compile(r'Inserts:.*?(\d+)', re.DOTALL)
     tolerance_pattern = re.compile(r'Tolerances: \n(.*?)\n', re.DOTALL)
     roughness_pattern = re.compile(r'.*Surface Roughness: \n.*?ish (\d.*?)(?:Ra, )(speci\nc area|entire part).*?(?:Part|Notes).*', re.DOTALL)
     marking_pattern = re.compile(r'Part Markings: \n(.*?)Notes:', re.DOTALL)
@@ -513,6 +514,8 @@ def process_notes(string):
 
     thread_matches = thread_pattern.search(string)
     logging.debug(f'thread_matches: {thread_matches}')
+    insert_matches = insert_pattern.search(string)
+    logging.debug(f'thread_matches: {insert_matches}')
     tolerance_matches = tolerance_pattern.search(string)
     logging.debug(f'tolerance_matches: {tolerance_matches}')
     roughness_matches = roughness_pattern.search(string)
@@ -525,6 +528,9 @@ def process_notes(string):
     if thread_matches is not None:
         new_string += 'Threads/Tapped Holes: ' + remove_newlines(thread_matches.group(2)) + '\n'
         logging.debug(f'current new string after thread_matches: \n{new_string}')
+    if insert_matches is not None:
+        new_string += 'Inserts: ' + remove_newlines(insert_matches.group(1)) + '\n'
+        logging.debug(f'current new string after insert_matches: \n{new_string}')
     if tolerance_matches is not None:
         new_string += 'Tolerances: ' + remove_newlines(tolerance_matches.group(1)) + '\n'
         logging.debug(f'current new string after tolerance_matches: \n{new_string}')
