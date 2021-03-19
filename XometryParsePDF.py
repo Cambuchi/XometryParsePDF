@@ -17,11 +17,13 @@ from openpyxl.drawing.spreadsheet_drawing import AbsoluteAnchor
 from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
 from openpyxl.utils.units import pixels_to_EMU
 from win32com import client
+# Import win32api is not used in code but necessary for pyinstaller creation of .exe file.
+import win32api
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d: %(message)s', datefmt='%H:%M:%S')
-# logging.disable(logging.DEBUG)  # uncomment to view debug log messages
-# logging.disable(logging.INFO)  # uncomment to view info log messages
+logging.disable(logging.DEBUG)  # uncomment to view debug log messages
+logging.disable(logging.INFO)  # uncomment to view info log messages
 
 
 def read_document(abs_folder_path):
@@ -478,6 +480,15 @@ def excel_to_pdf(folder_path):
             app.Interactive = False
             app.Visible = False
             workbook = app.Workbooks.Open(folder_path + '\\' + file)
+
+            print_area = 'A1:C26'
+            ws = workbook.Worksheets[0]
+            ws.PageSetup.Zoom = False
+            ws.PageSetup.FitToPagesTall = 2
+            ws.PageSetup.FitToPagesWide = 1
+            ws.PageSetup.PrintArea = print_area
+            workbook.WorkSheets(1).Select()
+
             try:
                 workbook.ActiveSheet.ExportAsFixedFormat(0, folder_path + '\\' + output_file)
             except Exception as e:
