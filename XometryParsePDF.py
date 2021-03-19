@@ -526,22 +526,22 @@ def process_notes(string):
     logging.debug(f'main_matches: {main_matches}')
 
     if thread_matches is not None:
-        new_string += 'Threads/Tapped Holes: ' + remove_newlines(thread_matches.group(2)) + '\n'
+        new_string += '\nThreads/Tapped Holes: ' + remove_newlines(thread_matches.group(2)) + '\n'
         logging.debug(f'current new string after thread_matches: \n{new_string}')
     if insert_matches is not None:
-        new_string += 'Inserts: ' + remove_newlines(insert_matches.group(1)) + '\n'
+        new_string += '\nInserts: ' + remove_newlines(insert_matches.group(1)) + '\n'
         logging.debug(f'current new string after insert_matches: \n{new_string}')
     if tolerance_matches is not None:
-        new_string += 'Tolerances: ' + remove_newlines(tolerance_matches.group(1)) + '\n'
+        new_string += '\nTolerances: ' + remove_newlines(tolerance_matches.group(1)) + '\n'
         logging.debug(f'current new string after tolerance_matches: \n{new_string}')
     if roughness_matches is not None:
-        new_string += 'Surface Roughness: ' + remove_newlines(roughness_matches.group(1)) + ' Ra, ' + regex_specic_check(remove_newlines(roughness_matches.group(2))) + '\n'
+        new_string += '\nSurface Roughness: ' + remove_newlines(roughness_matches.group(1)) + ' Ra, ' + regex_specic_check(remove_newlines(roughness_matches.group(2))) + '\n'
         logging.debug(f'current new string after roughness_matches: \n{new_string}')
     if marking_matches is not None:
-        new_string += 'Part Markings: ' + remove_newlines(marking_matches.group(1)) + '\n'
+        new_string += '\nPart Markings: ' + remove_newlines(marking_matches.group(1)) + '\n'
         logging.debug(f'current new string after marking_matches: \n{new_string}')
     if main_matches is not None:
-        new_string += 'Notes: ' + main_matches.group(1)
+        new_string += '\n\n\n\nNotes: ' + main_matches.group(1)
         logging.debug(f'current new string after main_matches: \n{new_string}')
 
     return new_string
