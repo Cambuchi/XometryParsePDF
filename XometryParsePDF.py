@@ -85,7 +85,7 @@ def traveler_process(filename):
         Quantity
         (0\w{6})                                                            # 4 Part ID
         (.*?)                                                               # 5 Part name
-        (\.\n?sldprt|\.\n?SLDPRT|\.\n?step|\.\n?STEP|\.\n?stp|\.\n?STP|\.\n?x_t|\.\n?s\n?tp)        # 6 Extension
+        (\.\n?sldprt|\.\n?SLDPRT|\.\n?step|\.\n?STEP|\.\n?stp|\.\n?STP|\.\n?x_t|\.\n?s\n?tp|\.\n?prt)        # 6 Extension
         .*?
         (\d+)                                                               # 7 Quantity
         .*?
