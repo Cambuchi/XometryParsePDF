@@ -92,7 +92,7 @@ def traveler_process(filename):
         tions
         (.*?[a-z])                                                          # 8 Finish
         (\n?[A-Z\d].*?)                                                     # 9 Material
-        (Cert.*?)                                                           # 10 Certifications
+        (\n-.*?|Cert.*?)\n?                                                          # 10 Certifications
         Inspection.*?[a-z]
         ([A-Z].*?)                                                          # 11 Inspection Requirements
         (Features:.*)                                                       # 12 Notes
